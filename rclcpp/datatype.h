@@ -47,7 +47,7 @@ namespace Datatype {
         else if constexpr (std::is_same_v<rawT, __float128>) return ROSLIKE_FLOAT128;
         else if constexpr (std::is_same_v<rawT, std::string>) return ROSLIKE_STRING;
         else if constexpr (std::is_same_v<rawT, std::string_view>) return ROSLIKE_STRING;
-        //TODO()
+        //TODO() : NONE 예외처리
         else return ROSLIKE_NONE;
     }
 
