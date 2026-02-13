@@ -7,44 +7,50 @@
 
 #define ROSLIKE_NONE 0
 #define ROSLIKE_BOOL 1
-#define ROSLIKE_INT8 2
-#define ROSLIKE_UINT8 3
-#define ROSLIKE_INT16 4
-#define ROSLIKE_UINT16 5
-#define ROSLIKE_INT32 6
-#define ROSLIKE_UINT32 7
-#define ROSLIKE_INT64 8
-#define ROSLIKE_UINT64 9
-#define ROSLIKE_FLOAT32 11
-#define ROSLIKE_FLOAT64 12
-#define ROSLIKE_FLOAT128 13
-#define ROSLIKE_STRING 20
-#define ROSLIKE_ARRAY 30
-#define ROSLIKE_ARRAY_START 31
-#define ROSLIKE_ARRAY_END 32
+#define ROSLIKE_INT8 3
+#define ROSLIKE_UINT8 4
+#define ROSLIKE_INT16 6
+#define ROSLIKE_UINT16 7
+#define ROSLIKE_INT32 9
+#define ROSLIKE_UINT32 10
+#define ROSLIKE_INT64 12
+#define ROSLIKE_UINT64 13
+#define ROSLIKE_FLOAT32 20
+#define ROSLIKE_FLOAT64 22
+#define ROSLIKE_FLOAT128 24
+#define ROSLIKE_STRING 30
+#define ROSLIKE_ARRAY 40
 
 #include <cstdint>
 #include <type_traits>
 #include <string>
-//container & c-style array >> //TODO()
-template<typename T>
-consteval uint8_t get_tag() {
-    if constexpr (std::is_same_v<T, bool>) return ROSLIKE_BOOL;
-    else if constexpr (std::is_same_v<T, int8_t>) return ROSLIKE_INT8;
-    else if constexpr (std::is_same_v<T, uint8_t>) return ROSLIKE_UINT8;
-    else if constexpr (std::is_same_v<T, int16_t>) return ROSLIKE_INT16;
-    else if constexpr (std::is_same_v<T, uint16_t>) return ROSLIKE_UINT16;
-    else if constexpr (std::is_same_v<T, int32_t>) return ROSLIKE_INT32;
-    else if constexpr (std::is_same_v<T, uint32_t>) return ROSLIKE_UINT32;
-    else if constexpr (std::is_same_v<T, int64_t>) return ROSLIKE_INT64;
-    else if constexpr (std::is_same_v<T, uint64_t>) return ROSLIKE_UINT64;
-    else if constexpr (std::is_same_v<T, float>) return ROSLIKE_FLOAT32;
-    else if constexpr (std::is_same_v<T, double>) return ROSLIKE_FLOAT64;
-    else if constexpr (std::is_same_v<T, __float128>) return ROSLIKE_FLOAT128;
-    else if constexpr (std::is_same_v<T, std::string>) return ROSLIKE_STRING;
-    else if constexpr (std::is_same_v<T, std::string_view>) return ROSLIKE_STRING;
-    //TODO()
-    else return ROSLIKE_NONE;
+
+namespace Datatype {
+    template<typename T>
+ uint8_t get_tag() {
+        using rawT = std::conditional_t<
+            std::is_pointer_v<std::remove_cvref_t<T>>,
+            std::remove_pointer_t<std::remove_cvref_t<T>>,
+        std::remove_cvref_t<T>
+        >;
+        if constexpr (std::is_same_v<rawT, bool>) return ROSLIKE_BOOL;
+        else if constexpr (std::is_same_v<rawT, int8_t>) return ROSLIKE_INT8;
+        else if constexpr (std::is_same_v<rawT, uint8_t>) return ROSLIKE_UINT8;
+        else if constexpr (std::is_same_v<rawT, int16_t>) return ROSLIKE_INT16;
+        else if constexpr (std::is_same_v<rawT, uint16_t>) return ROSLIKE_UINT16;
+        else if constexpr (std::is_same_v<rawT, int32_t>) return ROSLIKE_INT32;
+        else if constexpr (std::is_same_v<rawT, uint32_t>) return ROSLIKE_UINT32;
+        else if constexpr (std::is_same_v<rawT, int64_t>) return ROSLIKE_INT64;
+        else if constexpr (std::is_same_v<rawT, uint64_t>) return ROSLIKE_UINT64;
+        else if constexpr (std::is_same_v<rawT, float>) return ROSLIKE_FLOAT32;
+        else if constexpr (std::is_same_v<rawT, double>) return ROSLIKE_FLOAT64;
+        else if constexpr (std::is_same_v<rawT, __float128>) return ROSLIKE_FLOAT128;
+        else if constexpr (std::is_same_v<rawT, std::string>) return ROSLIKE_STRING;
+        else if constexpr (std::is_same_v<rawT, std::string_view>) return ROSLIKE_STRING;
+        //TODO()
+        else return ROSLIKE_NONE;
+    }
+
 }
 
 #endif //MY_ROS_DATATYPE_H

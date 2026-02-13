@@ -12,6 +12,7 @@ add_executable(my_ros main.cpp
         shared_mem.cpp
         shared_mem.h
         datatype.h
+        serializer.h
 )
 target_compile_options(my_ros PRIVATE -freflection)
 target_link_libraries(my_ros PRIVATE cppzmq-static)
