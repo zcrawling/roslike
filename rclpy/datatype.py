@@ -1,19 +1,19 @@
 import numpy as np
 
 class Datatype:
-    NONE     = 0
-    BOOL     = 1
-    INT8     = 3
-    UINT8    = 4
-    INT16    = 6
-    UINT16   = 7
-    INT32    = 9
-    UINT32   = 10
-    INT64    = 12
-    UINT64   = 13
-    FLOAT32  = 20
-    FLOAT64  = 22
-    FLOAT128 = 24
+    NONE     = 255
+    BOOL     = 0
+    INT8     = 11
+    UINT8    = 1
+    INT16    = 12
+    UINT16   = 2
+    INT32    = 14
+    UINT32   = 4
+    INT64    = 18
+    UINT64   = 8
+    FLOAT32  = 24
+    FLOAT64  = 28
+    # FLOAT128 = 29
     STRING   = 30
     ARRAY    = 40
 
@@ -43,7 +43,7 @@ class Datatype:
         np.uint64: UINT64,
         np.float32: FLOAT32,
         np.float64: FLOAT64,
-        np.float128: FLOAT128,
+        # np.float128: FLOAT128,
     }
 
     @classmethod

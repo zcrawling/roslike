@@ -6,35 +6,40 @@ class Serializer:
     def __init__(self):
         self.buffer = bytearray()
 
-    def pack(self, data):
-        tag = Datatype.get_tag(data)
-        if isinstance(data, (list, np.ndarray)):
-            # T
-            self.buffer.append(Datatype.ARRAY)
-            # L
-            count = len(data) if isinstance(data, list) else data.size
-            self.buffer.extend(struct.pack('<I', count))
-            # V (recursive)
-            items = data.flat if isinstance(data, np.ndarray) else data
-            for item in items:
-                self.pack(item)
+    def pack(self, data, tag = None):
+        """
+        data: 실제 값
+        tag: 전송할 타입. EX) Datatype.UINT32
+        """
+        if tag is None:
+            tag = Datatype.get_tag(data)
 
-        elif isinstance(data, str):
+        if tag is Datatype.STRING:
             # T
             self.buffer.append(Datatype.STRING)
             encoded = data.encode('utf-8')
             # L
-            self.buffer.extend(struct.pack('<I', len(encoded)))
+            self.buffer.extend(struct.pack("<I",len(encoded)))
             # V
             self.buffer.extend(encoded)
-
-        else:
-            if tag in Datatype.FORMAT_MAP:
+        elif tag in Datatype.FORMAT_MAP:
                 # T
                 self.buffer.append(tag)
-                fmt = '<' + Datatype.FORMAT_MAP[tag]
                 # V
+                fmt = '<' + Datatype.FORMAT_MAP[tag]
                 self.buffer.extend(struct.pack(fmt, data))
+
+    def pack_array(self, data, instance_tag):
+        #T
+        self.buffer.append(Datatype.ARRAY)
+        #L
+        self.buffer.extend(struct.pack("<I", len(data)))
+        #T
+        self.buffer.append(instance_tag)
+        #V
+        fmt = '<' + Datatype.FORMAT_MAP[instance_tag]
+        for i in data:
+            self.buffer.extend(struct.pack(fmt, i))
 
 
 class Deserializer:
@@ -47,33 +52,56 @@ class Deserializer:
             return None
         tag = self.buffer[self.offset]
         self.offset += 1
-
+        #T
         if tag == Datatype.ARRAY:
+            results = []
+            #L
             count = struct.unpack_from('<I', self.buffer, self.offset)[0]
             self.offset += 4
-            return [self.unpack() for _ in range(count)]
-
+            #T
+            element_tag = self.buffer[self.offset]
+            self.offset += 1
+            #V
+            for _ in range(count):
+                if element_tag in Datatype.FORMAT_MAP:
+                    fmt = '<' + Datatype.FORMAT_MAP[element_tag]
+                    val = struct.unpack_from(fmt, self.buffer, self.offset)[0]
+                    self.offset += struct.calcsize(fmt)
+                    results.append(val)
+                elif element_tag == Datatype.STRING:
+                    str_len = struct.unpack_from('<I', self.buffer, self.offset)[0]
+                    self.offset += 4
+                    val = self.buffer[self.offset: self.offset + str_len].decode('utf-8')
+                    self.offset += str_len
+                    results.append(val)
+                elif element_tag == Datatype.ARRAY:
+                    self.offset -= 1
+                    results.append(self.unpack())
+            return results
         elif tag == Datatype.STRING:
-            length = struct.unpack_from('<I', self.buffer, self.offset)[0]
+            str_len = struct.unpack_from('<I', self.buffer, self.offset)[0]
             self.offset += 4
-            val = self.buffer[self.offset:self.offset + length].decode('utf-8')
-            self.offset += length
+            val = self.buffer[self.offset: self.offset + str_len].decode('utf-8')
+            self.offset += str_len
             return val
-
         elif tag in Datatype.FORMAT_MAP:
             fmt = '<' + Datatype.FORMAT_MAP[tag]
             val = struct.unpack_from(fmt, self.buffer, self.offset)[0]
             self.offset += struct.calcsize(fmt)
             return val
-
+        print("Error during deserialization!")
         return None
 
-# Serialize = Serializer()
-#
-# Serialize.pack(123)
-# Serialize.pack("dasda")
-# Serialize.pack([123, 424])
-# Deserialize = Deserializer(Serialize.buffer)
-# print(Deserialize.unpack())
-# print(Deserialize.unpack())
-# print(Deserialize.unpack())
+    def unpack_all(self):
+        result = []
+        while self.offset < len(self.buffer):
+            item = self.unpack()
+            result.append(item)
+
+        self.offset = 0
+        self.buffer = bytearray()
+        return result
+
+    def add(self, data):
+        self.buffer = data
+        self. offset = 0
