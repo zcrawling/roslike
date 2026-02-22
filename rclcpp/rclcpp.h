@@ -5,7 +5,7 @@
 #ifndef MY_ROS_RCLCPP_H
 #define MY_ROS_RCLCPP_H
 
-#include "../serializer.h"
+#include "serializer.h"
 #include <unordered_map>
 #include <BS_thread_pool.hpp>
 #include <functional>
@@ -42,6 +42,7 @@ namespace rclcpp {
         void subscribe(const std::string& topic, std::function<void(Args...)> callback) {
             if (!sub_sockets.contains(topic)) {
                 sub_sockets[topic] = std::make_unique<zmq::socket_t>(context, ZMQ_SUB);
+                sub_sockets[topic]->set(zmq::sockopt::subscribe, "");
                 // Discovery에서 연결해주기 전까진 일단 소켓만 생성 TODO() master node
             }
             callbacks[topic] = [this, callback](const std::vector<uint8_t>& data) {
@@ -102,7 +103,7 @@ namespace rclcpp {
                         }
                     }
                 }
-                std::this_thread::sleep_for(std::chrono::microseconds(500)); //TODO() policy
+                std::this_thread::sleep_for(std::chrono::microseconds(50000)); //TODO() policy
             }
         }
     };

@@ -12,5 +12,4 @@ add_executable(my_ros main.cpp
         serializer.h
         #        test/serializer.cpp
 )
-target_compile_options(my_ros PRIVATE -freflection)
 target_link_libraries(my_ros PRIVATE cppzmq-static)
