@@ -10,6 +10,5 @@ add_executable(my_ros main.cpp
         rclcpp.h
         datatype.h
         serializer.h
-        #        test/serializer.cpp
 )
 target_link_libraries(my_ros PRIVATE cppzmq-static)
