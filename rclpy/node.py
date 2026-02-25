@@ -1,13 +1,8 @@
-from platform import node
-
-import zmq
-import threading
-import time
-
+from serializer import Serializer, Deserializer
+from datatype import Datatype, _TypedValue
+import zmq, threading, time
 from concurrent.futures import ThreadPoolExecutor
 
-import datatype
-from serializer import Serializer, Deserializer
 
 class Node:
     def __init__(self, name, max_workers = 4):
@@ -23,28 +18,28 @@ class Node:
         self.receiver_thread = threading.Thread(target=self._run_receiver, daemon=True)
         self.receiver_thread.start()
 
-    def publish(self, topic, *args):
+    def publish(self, topic: str, *args: _TypedValue):
         if topic not in self.pub_sockets:
-            # 나중에 주소 bind코드 작성
             sock = self.context.socket(zmq.PUB)
+            ipc_addr = f"ipc:///tmp/roslike_{topic}"
+            sock.bind(ipc_addr)
             self.pub_sockets[topic] = sock
+            print(f"[{self.node_name}] pub bound to {ipc_addr}")
 
         se = Serializer()
-        se.pack(args[0],1)
-        se.pack(args[1],24)
-        se.pack(args[2],30)
-        se.pack_array(args[3],18)
-        # for arg in args:
-        #     se.pack(arg)
+        for arg in args:
+            se.pack(arg)
 
-        self.pub_sockets[topic].send(se.buffer)
+        self.pub_sockets[topic].send(bytes(se.buffer))
 
-    def subscribe(self, topic, callback):
-        """토픽과 콜백 등록"""
+    def subscribe(self, topic: str, callback):
         if topic not in self.sub_sockets:
             sock = self.context.socket(zmq.SUB)
-            sock.setsockopt(zmq.SUBSCRIBE, b"")  # 모든 메시지 수신
+            sock.setsockopt(zmq.SUBSCRIBE, b"")
+            ipc_addr = f"ipc:///tmp/roslike_{topic}"
+            sock.connect(ipc_addr)
             self.sub_sockets[topic] = sock
+            print(f"[{self.node_name}] sub connected to {ipc_addr}")
 
         self.callbacks[topic] = callback
 

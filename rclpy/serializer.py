@@ -1,45 +1,50 @@
+from datatype import Datatype, _TypedValue, Array
 import struct
-import numpy as np
-from datatype import Datatype
+
+
 
 class Serializer:
     def __init__(self):
         self.buffer = bytearray()
 
-    def pack(self, data, tag = None):
-        """
-        data: 실제 값
-        tag: 전송할 타입. EX) Datatype.UINT32
-        """
+    def pack(self, data, tag=None):
+        # 래퍼 클래스 인스턴스면 자동 추출
+        if isinstance(data, _TypedValue):
+            if isinstance(data, Array):
+                self._pack_array(data.value, data.inner_tag)
+                return
+            tag = data.tag
+            data = data.value
+
         if tag is None:
             tag = Datatype.get_tag(data)
 
         if tag is Datatype.STRING:
-            # T
             self.buffer.append(Datatype.STRING)
             encoded = data.encode('utf-8')
-            # L
-            self.buffer.extend(struct.pack("<I",len(encoded)))
-            # V
+            self.buffer.extend(struct.pack('<I', len(encoded)))
             self.buffer.extend(encoded)
         elif tag in Datatype.FORMAT_MAP:
-                # T
-                self.buffer.append(tag)
-                # V
-                fmt = '<' + Datatype.FORMAT_MAP[tag]
-                self.buffer.extend(struct.pack(fmt, data))
+            self.buffer.append(tag)
+            fmt = '<' + Datatype.FORMAT_MAP[tag]
+            self.buffer.extend(struct.pack(fmt, data))
+        else:
+            raise ValueError(f"Unknown tag: {tag}")
 
-    def pack_array(self, data, instance_tag):
-        #T
+    def _pack_array(self, data, instance_tag):
+        """내부용. 외부에서는 Array 래퍼 클래스로 접근."""
+        if instance_tag not in Datatype.FORMAT_MAP:
+            raise ValueError(f"Array inner tag not supported: {instance_tag}")
         self.buffer.append(Datatype.ARRAY)
-        #L
-        self.buffer.extend(struct.pack("<I", len(data)))
-        #T
+        self.buffer.extend(struct.pack('<I', len(data)))
         self.buffer.append(instance_tag)
-        #V
         fmt = '<' + Datatype.FORMAT_MAP[instance_tag]
         for i in data:
             self.buffer.extend(struct.pack(fmt, i))
+
+    # 하위호환: 기존 코드가 pack_array(data, tag) 로 직접 호출하던 부분용
+    def pack_array(self, data, instance_tag):
+        self._pack_array(data, instance_tag)
 
 
 class Deserializer:

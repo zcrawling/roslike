@@ -9,14 +9,9 @@
 #include <unordered_map>
 #include <BS_thread_pool.hpp>
 #include <functional>
+#include <iostream>
 
 namespace rclcpp {
-
-    struct Socket_info {
-        std::string topic;
-        std::string addr;
-        bool is_subscriber;
-    };
     class Node {
     private:
         zmq::context_t context;
@@ -27,9 +22,14 @@ namespace rclcpp {
         BS::thread_pool<> pool;
         std::atomic<bool> running{true};
         std::thread receiver_thread;
+        std::string node_name = "";
+        static std::string ipc_addr(const std::string& topic) {
+            return "ipc:///tmp/roslike_" + topic;
+        }
 
     public:
-        Node() : context(1), pool(std::thread::hardware_concurrency()) {
+        explicit Node(std::string name = "node") : node_name(std::move(name)),
+          context(1), pool(std::thread::hardware_concurrency()) {
             receiver_thread = std::thread([this] { run_receiver(); });
         }
 
@@ -43,26 +43,29 @@ namespace rclcpp {
             if (!sub_sockets.contains(topic)) {
                 sub_sockets[topic] = std::make_unique<zmq::socket_t>(context, ZMQ_SUB);
                 sub_sockets[topic]->set(zmq::sockopt::subscribe, "");
-                // Discovery에서 연결해주기 전까진 일단 소켓만 생성 TODO() master node
+                sub_sockets[topic]->connect(ipc_addr(topic));
+                std::cout << "[" << node_name << "] sub connected to "
+                          << ipc_addr(topic) << std::endl;
             }
-            callbacks[topic] = [this, callback](const std::vector<uint8_t>& data) {
+
+            callbacks[topic] = [callback](const std::vector<uint8_t>& data) {
                 Serializer::Deserializer de;
-                de.buffer = data;
-
+                de.set_buffer(data);
                 std::tuple<std::decay_t<Args>...> args_tuple;
-
                 std::apply([&de](auto&... args) {
                     de.unpack(args...);
                 }, args_tuple);
-
                 std::apply(callback, args_tuple);
             };
         }
+
 
         template<typename... Args>
         void publish(const std::string& topic, Args&&... args) {
             if (!pub_sockets.contains(topic)) {
                 pub_sockets[topic] = std::make_unique<zmq::socket_t>(context, ZMQ_PUB);
+                pub_sockets[topic]->bind(ipc_addr(topic));
+                std::cout << "pub bound to " << ipc_addr(topic) << std::endl;
             }
 
             Serializer::Serializer se;
@@ -70,19 +73,6 @@ namespace rclcpp {
 
             zmq::message_t msg(se.data(), se.size());
             pub_sockets[topic]->send(msg, zmq::send_flags::none);
-        }
-
-        void update_socket(const Socket_info& info) {
-            if (info.is_subscriber) {
-                if (sub_sockets.contains(info.topic)) {
-                    sub_sockets[info.topic]->set(zmq::sockopt::subscribe, "");
-                    sub_sockets[info.topic]->connect(info.addr);
-                }
-            } else {
-                if (pub_sockets.contains(info.topic)) {
-                    pub_sockets[info.topic]->connect(info.addr);
-                }
-            }
         }
 
     private:
