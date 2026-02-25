@@ -10,6 +10,7 @@
 #include <BS_thread_pool.hpp>
 #include <functional>
 #include <iostream>
+#include <shared_mutex>
 
 namespace rclcpp {
     class Node {
@@ -20,6 +21,7 @@ namespace rclcpp {
         std::unordered_map<std::string, std::function<void(const std::vector<uint8_t>&)>> callbacks;
 
         BS::thread_pool<> pool;
+        std::shared_mutex sub_mutex;
         std::atomic<bool> running{true};
         std::thread receiver_thread;
         std::string node_name = "";
@@ -40,6 +42,7 @@ namespace rclcpp {
 
         template<typename... Args>
         void subscribe(const std::string& topic, std::function<void(Args...)> callback) {
+            std::unique_lock lock(sub_mutex);
             if (!sub_sockets.contains(topic)) {
                 sub_sockets[topic] = std::make_unique<zmq::socket_t>(context, ZMQ_SUB);
                 sub_sockets[topic]->set(zmq::sockopt::subscribe, "");
@@ -78,6 +81,7 @@ namespace rclcpp {
     private:
         void run_receiver() {
             while (running) {
+                std::shared_lock lock(sub_mutex);
                 for (auto& [topic, socket] : sub_sockets) {
                     zmq::message_t msg;
                     if (socket->recv(msg, zmq::recv_flags::dontwait)) { //TODO() policy
