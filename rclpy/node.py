@@ -10,6 +10,7 @@ class Node:
         self.node_name = name
         self.context = zmq.Context()
         self.sub_lock = threading.Lock()
+        self.pub_lock = threading.Lock()
 
         self.pub_sockets = {}
         self.sub_sockets = {}
@@ -21,18 +22,19 @@ class Node:
         self.receiver_thread.start()
 
     def publish(self, topic: str, *args: _TypedValue):
-        if topic not in self.pub_sockets:
-            sock = self.context.socket(zmq.PUB)
-            ipc_addr = f"ipc:///tmp/roslike_{topic}"
-            sock.bind(ipc_addr)
-            self.pub_sockets[topic] = sock
-            print(f"[{self.node_name}] pub bound to {ipc_addr}")
+        with self.pub_lock:
+            if topic not in self.pub_sockets:
+                sock = self.context.socket(zmq.PUB)
+                ipc_addr = f"ipc:///tmp/roslike_{topic}"
+                sock.bind(ipc_addr)
+                self.pub_sockets[topic] = sock
+                print(f"[{self.node_name}] pub bound to {ipc_addr}")
 
-        se = Serializer()
-        for arg in args:
-            se.pack(arg)
+            se = Serializer()
+            for arg in args:
+                se.pack(arg)
 
-        self.pub_sockets[topic].send(bytes(se.buffer))
+            self.pub_sockets[topic].send(bytes(se.buffer))
 
     def subscribe(self, topic: str, callback):
         with self.sub_lock:
@@ -49,20 +51,20 @@ class Node:
         """수신 전용 루프 (C++의 run_receiver 역할)"""
         while self.running:
             with self.sub_lock:
+                snapshot = list(self.sub_sockets.items())
                 # 소켓 리스트 복사해서 순회 (중간에 추가될 수 있으므로)
-                for topic, sock in list(self.sub_sockets.items()):
-                    try:
-                        # 비차단 모드로 수신
-                        msg = sock.recv(flags=zmq.NOBLOCK)
+            for topic, sock in list(snapshot):
+                try:
+                    # 비차단 모드로 수신
+                    msg = sock.recv(flags=zmq.NOBLOCK)
 
-                        if topic in self.callbacks:
-                            #
-                            # 수신 즉시 스레드풀에 언팩 및 콜백 실행 던짐
-                            self.executor.submit(self._execute_callback, topic, msg)
-                    except zmq.Again:
-                        continue  # 받은 메시지 없음
-                    except Exception as e:
-                        print(f"Receiver Error: {e}")
+                    if topic in self.callbacks:
+                        # 수신 즉시 스레드풀에 언팩 및 콜백 실행 던짐
+                        self.executor.submit(self._execute_callback, topic, msg)
+                except zmq.Again:
+                    continue  # 받은 메시지 없음
+                except Exception as e:
+                    print(f"Receiver Error: {e}")
 
             time.sleep(0.001)  # CPU 점유율 방지
 

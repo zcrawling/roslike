@@ -22,6 +22,7 @@ namespace rclcpp {
 
         BS::thread_pool<> pool;
         std::shared_mutex sub_mutex;
+        std::mutex pub_mutex;
         std::atomic<bool> running{true};
         std::thread receiver_thread;
         std::string node_name = "";
@@ -65,6 +66,7 @@ namespace rclcpp {
 
         template<typename... Args>
         void publish(const std::string& topic, Args&&... args) {
+            std::lock_guard lock(pub_mutex);
             if (!pub_sockets.contains(topic)) {
                 pub_sockets[topic] = std::make_unique<zmq::socket_t>(context, ZMQ_PUB);
                 pub_sockets[topic]->bind(ipc_addr(topic));
